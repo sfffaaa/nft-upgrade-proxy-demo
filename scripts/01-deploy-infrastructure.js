@@ -130,7 +130,19 @@ async function main() {
         const ERC721LogicV1 = await ethers.getContractFactory("ERC721LogicV1");
         const logicV1 = await ERC721LogicV1.deploy();
         const deployTx = logicV1.deploymentTransaction();
-        await logicV1.waitForDeployment();
+        console.log(`   📤 Deploy tx hash: ${deployTx.hash.slice(0, 10)}...`);
+        console.log(`   ⏳ Waiting for contract deployment...`);
+        
+        // Add timeout protection
+        const deploymentTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Deployment timeout after 120s")), 120000)
+        );
+        
+        await Promise.race([
+            logicV1.waitForDeployment(),
+            deploymentTimeout
+        ]);
+        
         logicV1Address = await logicV1.getAddress();
         console.log("   🏭 ERC721LogicV1 deployed to:", logicV1Address);
         return deployTx;
@@ -144,7 +156,19 @@ async function main() {
         const ProxyAdmin = await ethers.getContractFactory("ProxyAdmin");
         const proxyAdmin = await ProxyAdmin.deploy(deployer.address);
         const deployTx = proxyAdmin.deploymentTransaction();
-        await proxyAdmin.waitForDeployment();
+        console.log(`   📤 Deploy tx hash: ${deployTx.hash.slice(0, 10)}...`);
+        console.log(`   ⏳ Waiting for contract deployment...`);
+        
+        // Add timeout protection
+        const deploymentTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Deployment timeout after 120s")), 120000)
+        );
+        
+        await Promise.race([
+            proxyAdmin.waitForDeployment(),
+            deploymentTimeout
+        ]);
+        
         proxyAdminAddress = await proxyAdmin.getAddress();
         console.log("   🏭 ProxyAdmin deployed to:", proxyAdminAddress);
         console.log("   ProxyAdmin owner:", deployer.address);
@@ -159,7 +183,19 @@ async function main() {
         const NFTFactory = await ethers.getContractFactory("NFTFactory");
         const factory = await NFTFactory.deploy(logicV1Address, proxyAdminAddress);
         const deployTx = factory.deploymentTransaction();
-        await factory.waitForDeployment();
+        console.log(`   📤 Deploy tx hash: ${deployTx.hash.slice(0, 10)}...`);
+        console.log(`   ⏳ Waiting for contract deployment...`);
+        
+        // Add timeout protection
+        const deploymentTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Deployment timeout after 120s")), 120000)
+        );
+        
+        await Promise.race([
+            factory.waitForDeployment(),
+            deploymentTimeout
+        ]);
+        
         factoryAddress = await factory.getAddress();
         console.log("   🏭 NFTFactory deployed to:", factoryAddress);
         return deployTx;

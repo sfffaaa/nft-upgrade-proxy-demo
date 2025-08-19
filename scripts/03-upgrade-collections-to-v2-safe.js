@@ -226,20 +226,31 @@ async function main() {
         const feeData = await ethers.provider.getFeeData();
         const deployGasPrice = feeData.gasPrice * 2n;
         
+        console.log("   📤 Deploying with gas price:", ethers.formatUnits(deployGasPrice, "gwei"), "gwei");
         const logicV2Fixed = await ERC721LogicV2Fixed.deploy({
             gasPrice: deployGasPrice,
             gasLimit: 3000000 // Increased gas limit for larger contract
         });
         
         const deployTx = logicV2Fixed.deploymentTransaction();
+        console.log(`   📤 Deploy tx hash: ${deployTx.hash.slice(0, 10)}...`);
         console.log(`   📤 Deploy tx nonce: ${deployTx.nonce}`);
         
         // Show current block when tx is sent
         const currentBlockAtSend = await ethers.provider.getBlock("latest");
         console.log(`   📊 Current block when sent: #${currentBlockAtSend.number} (${currentBlockAtSend.hash.slice(0, 10)}...)`);
         
-        // Wait for deployment and get address
-        await logicV2Fixed.waitForDeployment();
+        // Wait for deployment with timeout
+        console.log("   ⏳ Waiting for contract deployment...");
+        const deploymentTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Deployment timeout after 120s")), 120000)
+        );
+        
+        await Promise.race([
+            logicV2Fixed.waitForDeployment(),
+            deploymentTimeout
+        ]);
+        
         logicV2FixedAddress = await logicV2Fixed.getAddress();
         console.log("   🏭 Contract deployed to:", logicV2FixedAddress);
         

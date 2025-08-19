@@ -1,7 +1,7 @@
 const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
-const { exec } = require("child_process");
+const { exec, spawn } = require("child_process");
 const { promisify } = require("util");
 const { Keyring } = require("@polkadot/keyring");
 const { cryptoWaitReady } = require("@polkadot/util-crypto");
@@ -28,7 +28,7 @@ async function main() {
     console.log("   ✅ Deployment artifacts cleaned\n");
 
     // Step 2: Transfer tokens from //Alice to three accounts  
-    console.log("2. 💰 Transferring 100 ETH from //Alice to three accounts...");
+    console.log("2. 💰 Setting balances for three accounts using //Alice sudo...");
     
     // Initialize crypto and create substrate //Alice keypair (matching peaq-bc-test pattern)
     console.log("   🔧 Initializing Polkadot.js crypto...");
@@ -49,9 +49,9 @@ async function main() {
         { name: "Diana", address: signers[2] ? signers[2].address : signers[1].address }  // Test user Diana
     ];
 
-    // For localhost Hardhat network, we'll simulate the substrate transfer pattern
-    // In a real Peaq network, this would use substrate.tx.balances.transfer
-    console.log("   🚀 Using //Alice as funder (simulated substrate pattern)...");
+    // For localhost Hardhat network, we'll simulate the substrate sudo pattern
+    // In a real Peaq network, this would use sudo.balances.force_set_balance
+    console.log("   🚀 Using //Alice with sudo privileges (peaq-bc-test pattern)...");
     
     // Connect to substrate API (for localhost, we'll use a fallback simulation)
     let api;
@@ -67,27 +67,66 @@ async function main() {
 
     const transferAmount = ethers.parseEther("100"); // 100 ETH per recipient
     
-    if (api && api.tx && api.tx.balances && api.tx.balances.transfer) {
-        // Real substrate transfer (like peaq-bc-test)
-        console.log("   📤 Executing substrate transfers from //Alice...");
+    if (api && api.tx && api.tx.sudo && api.tx.sudo.sudo) {
+        // Real substrate operations using sudo (like peaq-bc-test)
+        console.log("   📤 Using sudo.balances.force_set_balance for each recipient...");
+        
+        // Get current nonce for Alice
+        const { nonce: startNonce } = await api.query.system.account(aliceKeypair.address);
+        console.log(`   🔢 Alice starting nonce: ${startNonce.toString()}`);
         
         for (let i = 0; i < recipients.length; i++) {
             const recipient = recipients[i];
-            console.log(`   Transferring 100 ETH to ${recipient.name} (${recipient.address})...`);
+            console.log(`   Setting balance of 1000 ETH for ${recipient.name} (${recipient.address})...`);
             
-            // Calculate EVM account from recipient address (peaq pattern)
-            const transfer = api.tx.balances.transfer(recipient.address, transferAmount);
-            const hash = await transfer.signAndSend(aliceKeypair);
+            const currentNonce = startNonce.toNumber() + i;
+            console.log(`   📤 Using nonce: ${currentNonce}`);
             
-            console.log(`   📋 Transfer hash: ${hash.toHex()}`);
-            console.log(`   ✅ ${recipient.name} transfer submitted`);
+            try {
+                // Use sudo.balances.force_set_balance with explicit nonce (authentic peaq pattern)
+                const setBalance = api.tx.sudo.sudo(
+                    api.tx.balances.forceSetBalance(recipient.address, ethers.parseEther("1000"))
+                );
+                
+                const hash = await setBalance.signAndSend(aliceKeypair, { nonce: currentNonce });
+                console.log(`   📋 Sudo operation hash: ${hash.toHex()}`);
+                console.log(`   ✅ ${recipient.name} balance set via sudo`);
+                
+                // Wait a bit between transactions to avoid mempool conflicts
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+            } catch (error) {
+                console.log(`   ⚠️  Sudo operation failed: ${error.message}`);
+                console.log(`   🔄 Retrying with higher nonce...`);
+                
+                // Retry with incremented nonce
+                try {
+                    const retryNonce = currentNonce + 10;
+                    const setBalance = api.tx.sudo.sudo(
+                        api.tx.balances.forceSetBalance(recipient.address, ethers.parseEther("1000"))
+                    );
+                    
+                    const hash = await setBalance.signAndSend(aliceKeypair, { nonce: retryNonce });
+                    console.log(`   📋 Retry sudo operation hash: ${hash.toHex()}`);
+                    console.log(`   ✅ ${recipient.name} balance set via sudo (retry)`);
+                    
+                } catch (retryError) {
+                    console.log(`   ❌ Retry failed: ${retryError.message}`);
+                    console.log(`   ⚠️  Falling back to ethers simulation for remaining accounts`);
+                    await api.disconnect();
+                    api = null; // Force fallback to ethers
+                    break;
+                }
+            }
         }
         
-        await api.disconnect();
+        if (api) {
+            await api.disconnect();
+        }
         
     } else {
         if (api) {
-            console.log("   ⚠️  Connected node doesn't have balances pallet, using ethers simulation");
+            console.log("   ⚠️  Connected node doesn't have sudo pallet, using ethers simulation");
             await api.disconnect();
         }
         // Fallback: Use ethers with //Alice derived private key  
@@ -155,18 +194,43 @@ async function main() {
         console.log("═".repeat(80));
         
         try {
-            const { stdout, stderr } = await execAsync(`npx hardhat run scripts/${script.number}-${script.name}.js --network localhost`);
+            // Use spawn for real-time output streaming
             
-            if (stderr && !stderr.includes("Warning")) {
-                console.log("⚠️  Script warnings:", stderr);
-            }
-            
-            console.log(stdout);
-            console.log(`✅ Script ${script.number} completed successfully\n`);
+            await new Promise((resolve, reject) => {
+                const child = spawn('npx', ['hardhat', 'run', `scripts/${script.number}-${script.name}.js`, '--network', 'localhost'], {
+                    stdio: ['inherit', 'pipe', 'pipe'],
+                    shell: true
+                });
+                
+                // Stream stdout in real-time
+                child.stdout.on('data', (data) => {
+                    process.stdout.write(data);
+                });
+                
+                // Stream stderr but filter out warnings
+                child.stderr.on('data', (data) => {
+                    const output = data.toString();
+                    if (!output.includes("Warning") && !output.includes("Downloading compiler")) {
+                        process.stderr.write(`⚠️  ${output}`);
+                    }
+                });
+                
+                child.on('close', (code) => {
+                    if (code === 0) {
+                        console.log(`\n✅ Script ${script.number} completed successfully\n`);
+                        resolve();
+                    } else {
+                        reject(new Error(`Script ${script.number} exited with code ${code}`));
+                    }
+                });
+                
+                child.on('error', (error) => {
+                    reject(error);
+                });
+            });
             
         } catch (error) {
             console.error(`❌ Script ${script.number} failed:`, error.message);
-            console.log("📊 Error details:", error.stdout || error.stderr);
             process.exit(1);
         }
     }
