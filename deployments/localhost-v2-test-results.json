@@ -1,7 +1,7 @@
 {
-  "testTime": "2025-08-19T15:03:21.550Z",
+  "testTime": "2025-08-19T16:12:00.334Z",
   "version": "2.0.0",
-  "collections": 0,
+  "collections": 2,
   "featuresTests": [
     "Batch Minting",
     "Reveal Mechanism",

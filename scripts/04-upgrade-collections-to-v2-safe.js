@@ -3,8 +3,44 @@ const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
-// Function to wait for transaction with timeout and reorg handling
-async function waitForTransactionWithRetry(tx, description = "transaction", maxRetries = 3, timeoutMs = 60000) {
+// Function to backtrack recent blocks to find a transaction (inspired by peaq-bc-test)
+async function backtrackBlocksForTransaction(txHash, maxBlocks = 10) {
+    try {
+        const currentBlock = await ethers.provider.getBlockNumber();
+        console.log(`   🔍 Backtracking ${maxBlocks} blocks from block ${currentBlock} to find tx ${txHash.slice(0, 10)}...`);
+        
+        for (let i = 0; i < maxBlocks; i++) {
+            const blockNum = currentBlock - i;
+            if (blockNum < 0) break;
+            
+            try {
+                const block = await ethers.provider.getBlock(blockNum, true);
+                if (block && block.transactions) {
+                    for (let txIndex = 0; txIndex < block.transactions.length; txIndex++) {
+                        const blockTx = block.transactions[txIndex];
+                        if (blockTx.hash === txHash) {
+                            console.log(`   ✅ Found tx ${txHash.slice(0, 10)} in block ${blockNum} at index ${txIndex}`);
+                            return await ethers.provider.getTransactionReceipt(txHash);
+                        }
+                    }
+                }
+            } catch (blockError) {
+                console.log(`   ⚠️  Could not fetch block ${blockNum}: ${blockError.message}`);
+            }
+        }
+        
+        console.log(`   ❌ Transaction ${txHash.slice(0, 10)} not found in last ${maxBlocks} blocks`);
+        return null;
+    } catch (error) {
+        console.log(`   ⚠️  Backtrack search failed: ${error.message}`);
+        return null;
+    }
+}
+
+// Enhanced wait function with backtrack search (inspired by peaq-bc-test approach)
+async function waitForTransactionWithRetry(tx, description = "transaction", maxRetries = 3, timeoutMs = 30000) {
+    const BLOCK_WAIT_TIME = 15000; // 15 seconds between blocks (similar to substrate 4-block wait)
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`   ⏳ Waiting for ${description} (attempt ${attempt}/${maxRetries}, timeout: ${timeoutMs/1000}s)...`);
@@ -27,24 +63,58 @@ async function waitForTransactionWithRetry(tx, description = "transaction", maxR
             console.log(`   ❌ Attempt ${attempt} failed: ${error.message}`);
             
             if (attempt === maxRetries) {
-                throw new Error(`Failed to confirm ${description} after ${maxRetries} attempts: ${error.message}`);
-            }
-            
-            // Check if transaction is still pending
-            try {
-                const txStatus = await ethers.provider.getTransaction(tx.hash);
-                if (txStatus && txStatus.blockNumber) {
-                    console.log(`   🔍 Transaction was actually mined in block ${txStatus.blockNumber}, getting receipt...`);
-                    return await ethers.provider.getTransactionReceipt(tx.hash);
+                // Final attempt: try backtrack search before giving up
+                console.log(`   🔍 Final attempt: searching recent blocks for transaction...`);
+                const backtrackReceipt = await backtrackBlocksForTransaction(tx.hash);
+                if (backtrackReceipt) {
+                    console.log(`   ✅ ${description} found via backtrack search!`);
+                    return backtrackReceipt;
                 }
-                console.log(`   🔍 Transaction still pending, retrying...`);
-            } catch (checkError) {
-                console.log(`   ⚠️  Could not check transaction status: ${checkError.message}`);
+                
+                // Ultimate fallback: suggest manual retry
+                console.log(`   ⚠️  Transaction ${tx.hash.slice(0, 10)} may have been lost due to severe reorg`);
+                console.log(`   💡 Suggestion: The transaction may need to be re-submitted manually`);
+                throw new Error(`Failed to confirm ${description} after ${maxRetries} attempts and backtrack search. Transaction may be lost due to reorg.`);
             }
             
-            // Wait before retry
-            console.log(`   ⏳ Waiting 10 seconds before retry...`);
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            // Wait for blocks to settle (inspired by substrate wait_for_n_blocks pattern)
+            console.log(`   ⏳ Waiting ${BLOCK_WAIT_TIME/1000}s for blocks to settle...`);
+            await new Promise(resolve => setTimeout(resolve, BLOCK_WAIT_TIME));
+            
+            // Try backtrack search during retry
+            console.log(`   🔍 Checking if transaction was included during reorg...`);
+            const backtrackReceipt = await backtrackBlocksForTransaction(tx.hash);
+            if (backtrackReceipt) {
+                console.log(`   ✅ ${description} found via backtrack search during retry!`);
+                return backtrackReceipt;
+            }
+            
+            console.log(`   🔄 Transaction not found in recent blocks, will retry with new attempt...`);
+        }
+    }
+}
+
+// Function to execute transaction with full retry including re-submission
+async function executeTransactionWithFullRetry(txFunction, description = "transaction", maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   📤 Executing ${description} (attempt ${attempt}/${maxRetries})...`);
+            const tx = await txFunction();
+            console.log(`   📤 Transaction sent: ${tx.hash.slice(0, 10)}...`);
+            
+            const receipt = await waitForTransactionWithRetry(tx, description, 2, 45000); // 2 retries, 45s timeout per retry
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Full retry attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to execute ${description} after ${maxRetries} full retry attempts: ${error.message}`);
+            }
+            
+            // Wait longer between full retries
+            console.log(`   ⏳ Waiting 30s before full re-submission retry...`);
+            await new Promise(resolve => setTimeout(resolve, 30000));
         }
     }
 }
@@ -145,56 +215,40 @@ async function main() {
     }
     const collectionsData = JSON.parse(fs.readFileSync(collectionsFile, "utf8"));
 
-    // Deploy ERC721LogicV2Fixed with retry logic
+    // Deploy ERC721LogicV2Fixed with full retry logic
     console.log("\n1. Deploying ERC721LogicV2Fixed implementation...");
-    let logicV2Fixed;
     let logicV2FixedAddress;
     
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-            console.log(`   Attempt ${attempt}/3...`);
-            const ERC721LogicV2Fixed = await ethers.getContractFactory("ERC721LogicV2Fixed");
-            
-            // Use higher gas price for testnet stability
-            const feeData = await ethers.provider.getFeeData();
-            const deployGasPrice = feeData.gasPrice * 2n;
-            
-            logicV2Fixed = await ERC721LogicV2Fixed.deploy({
-                gasPrice: deployGasPrice,
-                gasLimit: 2000000 // Explicit gas limit
-            });
-            
-            const deployTx = logicV2Fixed.deploymentTransaction();
-            console.log(`   📤 Deploy tx sent: ${deployTx.hash}`);
-            console.log(`   📤 Deploy tx nonce: ${deployTx.nonce}`);
-            
-            // Show current block when tx is sent
-            const currentBlockAtSend = await ethers.provider.getBlock("latest");
-            console.log(`   📊 Current block when sent: #${currentBlockAtSend.number} (${currentBlockAtSend.hash.slice(0, 10)}...)`);
-            console.log("   ⏳ Waiting for deployment confirmation...");
-            
-            const receipt = await logicV2Fixed.waitForDeployment();
-            const deployReceipt = await waitForTransactionWithRetry(deployTx, "deployment");
-            
-            logicV2FixedAddress = await logicV2Fixed.getAddress();
-            console.log("   ✅ ERC721LogicV2Fixed deployed to:", logicV2FixedAddress);
-            console.log(`   📋 Deploy confirmed in block #${deployReceipt.blockNumber}, tx index: ${deployReceipt.index}`);
-            console.log(`   ⛽ Gas used: ${deployReceipt.gasUsed.toString()}`);
-            break; // Success, exit retry loop
-            
-        } catch (error) {
-            console.log(`   ❌ Attempt ${attempt} failed: ${error.message}`);
-            
-            if (attempt === 3) {
-                throw new Error(`Failed to deploy after 3 attempts: ${error.message}`);
-            }
-            
-            // Wait before retry and handle potential stuck transactions
-            console.log(`   ⏳ Waiting 15 seconds before retry...`);
-            await new Promise(resolve => setTimeout(resolve, 15000));
-            await handleReorgAndStuckTransactions(deployer);
-        }
-    }
+    const deployReceipt = await executeTransactionWithFullRetry(async () => {
+        const ERC721LogicV2Fixed = await ethers.getContractFactory("ERC721LogicV2Fixed");
+        
+        // Use higher gas price for testnet stability
+        const feeData = await ethers.provider.getFeeData();
+        const deployGasPrice = feeData.gasPrice * 2n;
+        
+        const logicV2Fixed = await ERC721LogicV2Fixed.deploy({
+            gasPrice: deployGasPrice,
+            gasLimit: 2000000 // Explicit gas limit
+        });
+        
+        const deployTx = logicV2Fixed.deploymentTransaction();
+        console.log(`   📤 Deploy tx nonce: ${deployTx.nonce}`);
+        
+        // Show current block when tx is sent
+        const currentBlockAtSend = await ethers.provider.getBlock("latest");
+        console.log(`   📊 Current block when sent: #${currentBlockAtSend.number} (${currentBlockAtSend.hash.slice(0, 10)}...)`);
+        
+        // Wait for deployment and get address
+        await logicV2Fixed.waitForDeployment();
+        logicV2FixedAddress = await logicV2Fixed.getAddress();
+        console.log("   🏭 Contract deployed to:", logicV2FixedAddress);
+        
+        return deployTx;
+    }, "ERC721LogicV2Fixed deployment");
+    
+    console.log("   ✅ ERC721LogicV2Fixed deployment completed!");
+    console.log(`   📋 Deploy confirmed in block #${deployReceipt.blockNumber}, tx index: ${deployReceipt.index}`);
+    console.log(`   ⛽ Gas used: ${deployReceipt.gasUsed.toString()}`);
 
     // Check and upgrade collections
     const collectionsToCheck = collectionsData.collections.slice(0, 2);
@@ -245,29 +299,31 @@ async function main() {
                 
                 console.log(`   Upgrading to V2Fixed and initializing features...`);
                 
-                // Prepare V2Fixed initialization data
-                const ERC721LogicV2FixedInterface = ERC721LogicV2Fixed.interface;
-                const initData = ERC721LogicV2FixedInterface.encodeFunctionData("initializeV2Features", [
-                    `https://metadata.peaq.network/${collection.symbol.toLowerCase()}/`,
-                    `https://metadata.peaq.network/${collection.symbol.toLowerCase()}/hidden.json`,
-                    deployer.address, // Royalty receiver
-                    250 // 2.5% royalty (250 basis points)
-                ]);
+                const upgradeReceipt = await executeTransactionWithFullRetry(async () => {
+                    // Prepare V2Fixed initialization data
+                    const ERC721LogicV2FixedFactory = await ethers.getContractFactory("ERC721LogicV2Fixed");
+                    const initData = ERC721LogicV2FixedFactory.interface.encodeFunctionData("initializeV2Features", [
+                        `https://metadata.peaq.network/${collection.symbol.toLowerCase()}/`,
+                        `https://metadata.peaq.network/${collection.symbol.toLowerCase()}/hidden.json`,
+                        deployer.address, // Royalty receiver
+                        250 // 2.5% royalty (250 basis points)
+                    ]);
 
-                const upgradeTx = await mainProxyAdmin.upgradeAndCall(
-                    collection.proxyAddress,
-                    logicV2FixedAddress,
-                    initData
-                );
-                console.log(`   📤 Upgrade tx sent: ${upgradeTx.hash}`);
-                console.log(`   📤 Upgrade tx nonce: ${upgradeTx.nonce}`);
+                    const upgradeTx = await mainProxyAdmin.upgradeAndCall(
+                        collection.proxyAddress,
+                        logicV2FixedAddress,
+                        initData
+                    );
+                    
+                    console.log(`   📤 Upgrade tx nonce: ${upgradeTx.nonce}`);
+                    
+                    // Show current block when tx is sent
+                    const currentBlockAtUpgrade = await ethers.provider.getBlock("latest");
+                    console.log(`   📊 Current block when sent: #${currentBlockAtUpgrade.number} (${currentBlockAtUpgrade.hash.slice(0, 10)}...)`);
+                    
+                    return upgradeTx;
+                }, `upgrade of ${collection.name}`);
                 
-                // Show current block when tx is sent
-                const currentBlockAtUpgrade = await ethers.provider.getBlock("latest");
-                console.log(`   📊 Current block when sent: #${currentBlockAtUpgrade.number} (${currentBlockAtUpgrade.hash.slice(0, 10)}...)`);
-                console.log("   ⏳ Waiting for upgrade confirmation...");
-                
-                const upgradeReceipt = await waitForTransactionWithRetry(upgradeTx, "upgrade");
                 console.log(`   ✅ Upgraded to V2Fixed and initialized features!`);
                 console.log(`   📋 Upgrade confirmed in block #${upgradeReceipt.blockNumber}, tx index: ${upgradeReceipt.index}`);
                 console.log(`   ⛽ Gas used: ${upgradeReceipt.gasUsed.toString()}`);

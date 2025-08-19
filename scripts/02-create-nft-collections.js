@@ -48,6 +48,31 @@ async function waitForTransactionWithRetry(tx, description = "transaction", maxR
     }
 }
 
+// Function to execute transaction with full retry including re-submission
+async function executeTransactionWithFullRetry(txFunction, description = "transaction", maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   📤 Executing ${description} (attempt ${attempt}/${maxRetries})...`);
+            const tx = await txFunction();
+            console.log(`   📤 Transaction sent: ${tx.hash.slice(0, 10)}...`);
+            
+            const receipt = await waitForTransactionWithRetry(tx, description, 2, 45000); // 2 retries, 45s timeout per retry
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Full retry attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to execute ${description} after ${maxRetries} full retry attempts: ${error.message}`);
+            }
+            
+            // Wait longer between full retries
+            console.log(`   ⏳ Waiting 30s before full re-submission retry...`);
+            await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+    }
+}
+
 async function main() {
     console.log("🎨 Starting NFT collections creation...\n");
 
@@ -102,14 +127,15 @@ async function main() {
         console.log(`   Max Supply: ${collection.maxSupply}`);
         console.log(`   Mint Price: ${ethers.formatEther(collection.mintPrice)} ETH`);
 
-        const tx = await factory.createNFTCollection(
-            collection.name,
-            collection.symbol,
-            collection.maxSupply,
-            collection.mintPrice
-        );
-
-        const receipt = await waitForTransactionWithRetry(tx, `collection creation for ${collection.name}`);
+        const receipt = await executeTransactionWithFullRetry(async () => {
+            const tx = await factory.createNFTCollection(
+                collection.name,
+                collection.symbol,
+                collection.maxSupply,
+                collection.mintPrice
+            );
+            return tx;
+        }, `collection creation for ${collection.name}`);
         
         // Get the deployed proxy address from events
         const event = receipt.logs.find(
@@ -170,8 +196,10 @@ async function main() {
     console.log(`Collection version: ${version}`);
     
     // Mint a test NFT
-    const mintTx = await firstCollection.mint(deployer.address, { value: deployedCollections[0].mintPrice });
-    await waitForTransactionWithRetry(mintTx, "test mint");
+    await executeTransactionWithFullRetry(async () => {
+        const mintTx = await firstCollection.mint(deployer.address, { value: deployedCollections[0].mintPrice });
+        return mintTx;
+    }, "test mint");
     
     const balance = await firstCollection.balanceOf(deployer.address);
     console.log(`✅ Test mint successful! Balance: ${balance} NFT(s)`);

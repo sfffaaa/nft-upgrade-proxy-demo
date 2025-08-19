@@ -1,40 +1,40 @@
 {
   "network": "localhost",
-  "deploymentTime": "2025-08-19T15:34:54.375Z",
+  "deploymentTime": "2025-08-19T16:10:36.429Z",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "factoryAddress": "0xD0141E899a65C95a556fE2B27e5982A6DE7fDD7A",
+  "factoryAddress": "0x66F625B8c4c635af8b74ECe2d7eD0D58b4af3C3d",
   "collections": [
     {
       "name": "Peaq Genesis Collection",
       "symbol": "PGC",
       "maxSupply": 10000,
       "mintPrice": "10000000000000000",
-      "proxyAddress": "0x0B3463c91F71beB2872e8880455753Fbe26faCd5",
-      "transactionHash": "0xc3b29aba0e572d7c38ed0daea4d669aa9fbd8214c4cad5e0196ad402ecb4f4ec",
-      "blockNumber": 4370
+      "proxyAddress": "0x4d463900ec6eAF3adEF02e12E12dbE8F43AFd4E4",
+      "transactionHash": "0x7c38d80b96a8f1e23d7340d795adb2a6ee3200d60c4ceb68fbaa5fbc849080e2",
+      "blockNumber": 4689
     },
     {
       "name": "Peaq Art Gallery",
       "symbol": "PAG",
       "maxSupply": 5000,
       "mintPrice": "50000000000000000",
-      "proxyAddress": "0x6AfaF4feDB927f92eCB4faEf08EDAfDF85E46f96",
-      "transactionHash": "0xd7962b9d1cb69e1f16c9269213888fd53386c7520c5ef21a990187e4b1e269aa",
-      "blockNumber": 4371
+      "proxyAddress": "0xe6F6A327419889674C7D0433C654F3Afd0A760f8",
+      "transactionHash": "0xe7565b82e0e7d1fbf00dc1bc545baf1ac2f309da21381cd4f0a5b2afc35d055e",
+      "blockNumber": 4692
     },
     {
       "name": "Peaq Exclusive Pass",
       "symbol": "PEP",
       "maxSupply": 1000,
       "mintPrice": "100000000000000000",
-      "proxyAddress": "0xfE690F9192F83cE063057d208161b6F79a9B77a2",
-      "transactionHash": "0x7271d2db202a90fa80f9e4b5c4ed4829d19289f65c175bb55efa932747d54225",
-      "blockNumber": 4372
+      "proxyAddress": "0x56C7e650a828F62C48430B75b21a71d8E6D75665",
+      "transactionHash": "0x02a28ff275a3b1cbfaa59c2a8b1a2d9221a213425ebbf782b2f8a39bb2271ab0",
+      "blockNumber": 4693
     }
   ],
   "allFactoryCollections": [
-    "0x0B3463c91F71beB2872e8880455753Fbe26faCd5",
-    "0x6AfaF4feDB927f92eCB4faEf08EDAfDF85E46f96",
-    "0xfE690F9192F83cE063057d208161b6F79a9B77a2"
+    "0x4d463900ec6eAF3adEF02e12E12dbE8F43AFd4E4",
+    "0xe6F6A327419889674C7D0433C654F3Afd0A760f8",
+    "0x56C7e650a828F62C48430B75b21a71d8E6D75665"
   ]
 }

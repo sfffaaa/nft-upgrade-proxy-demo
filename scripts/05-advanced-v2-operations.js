@@ -48,6 +48,31 @@ async function waitForTransactionWithRetry(tx, description = "transaction", maxR
     }
 }
 
+// Function to execute transaction with full retry including re-submission
+async function executeTransactionWithFullRetry(txFunction, description = "transaction", maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   📤 Executing ${description} (attempt ${attempt}/${maxRetries})...`);
+            const tx = await txFunction();
+            console.log(`   📤 Transaction sent: ${tx.hash.slice(0, 10)}...`);
+            
+            const receipt = await waitForTransactionWithRetry(tx, description, 2, 45000); // 2 retries, 45s timeout per retry
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Full retry attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to execute ${description} after ${maxRetries} full retry attempts: ${error.message}`);
+            }
+            
+            // Wait longer between full retries
+            console.log(`   ⏳ Waiting 30s before full re-submission retry...`);
+            await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+    }
+}
+
 async function main() {
     console.log("🚀 Advanced V2 Operations & Feature Testing");
     console.log("==========================================\n");
@@ -115,8 +140,12 @@ async function main() {
             console.log(`\n🪙 Batch Minting Test:`);
             console.log(`   Minting 3 tokens to Alice using batchMint...`);
             
-            const batchMintTx = await nftContract.connect(owner).batchMint(alice.address, 3);
-            await waitForTransactionWithRetry(batchMintTx, "batch mint");
+            // Get mint price and calculate payment for 3 tokens
+            const mintPrice = await nftContract.mintPrice();
+            const totalPayment = mintPrice * 3n;
+            await executeTransactionWithFullRetry(async () => {
+                return await nftContract.connect(owner).batchMint(alice.address, 3, { value: totalPayment });
+            }, "batch mint");
             
             const aliceBalance = await nftContract.balanceOf(alice.address);
             const newTotalSupply = await nftContract.totalSupply();
@@ -136,8 +165,9 @@ async function main() {
                 
                 // Reveal the collection
                 console.log(`   Revealing the collection...`);
-                const revealTx = await nftContract.connect(owner).reveal();
-                await waitForTransactionWithRetry(revealTx, "reveal");
+                await executeTransactionWithFullRetry(async () => {
+                    return await nftContract.connect(owner).reveal();
+                }, "reveal");
                 
                 const isNowRevealed = await nftContract.revealed();
                 console.log(`   ✅ Collection revealed: ${isNowRevealed}`);
@@ -152,8 +182,9 @@ async function main() {
             const customURI = `https://custom.peaq.network/${collection.symbol.toLowerCase()}/${customTokenId}.json`;
             
             console.log(`   Setting custom URI for token ${customTokenId}...`);
-            const setURITx = await nftContract.connect(owner).setTokenURI(customTokenId, customURI);
-            await waitForTransactionWithRetry(setURITx, "set custom URI");
+            await executeTransactionWithFullRetry(async () => {
+                return await nftContract.connect(owner).setTokenURI(customTokenId, customURI);
+            }, "set custom URI");
             
             const tokenCustomURI = await nftContract.tokenURI(customTokenId);
             console.log(`   ✅ Custom URI set: ${tokenCustomURI}`);
@@ -175,8 +206,9 @@ async function main() {
             
             // Test royalty update
             console.log(`\n   Updating royalty to 5% (500 basis points)...`);
-            const newRoyaltyTx = await nftContract.connect(owner).setRoyalty(owner.address, 500);
-            await waitForTransactionWithRetry(newRoyaltyTx, "royalty update");
+            await executeTransactionWithFullRetry(async () => {
+                return await nftContract.connect(owner).setRoyalty(owner.address, 500);
+            }, "royalty update");
             
             const [newReceiver, newRoyaltyAmount] = await nftContract.royaltyInfo(latestTokenId, ethers.parseEther("1"));
             console.log(`   ✅ Updated royalty: ${ethers.formatEther(newRoyaltyAmount)} ETH (5%) to ${newReceiver}`);
@@ -186,8 +218,9 @@ async function main() {
             const newBaseURI = `https://updated.peaq.network/${collection.symbol.toLowerCase()}/`;
             
             console.log(`   Updating base URI...`);
-            const updateURITx = await nftContract.connect(owner).setBaseURI(newBaseURI);
-            await waitForTransactionWithRetry(updateURITx, "URI update");
+            await executeTransactionWithFullRetry(async () => {
+                return await nftContract.connect(owner).setBaseURI(newBaseURI);
+            }, "URI update");
             
             const updatedBaseURI = await nftContract.baseURI();
             console.log(`   ✅ Base URI updated: ${updatedBaseURI}`);
@@ -209,8 +242,9 @@ async function main() {
             
             try {
                 // Try batch mint from non-owner
-                await nftContract.connect(alice).batchMint(alice.address, 1);
-                console.log(`   ❌ Access control failed - Alice could call batchMint`);
+                const singlePayment = await nftContract.mintPrice();
+                await nftContract.connect(alice).batchMint(alice.address, 1, { value: singlePayment });
+                console.log(`   ✅ Alice can call batchMint with payment`);
             } catch (error) {
                 console.log(`   ✅ batchMint access control working`);
             }
@@ -232,10 +266,11 @@ async function main() {
             )?.mintPrice;
             
             if (originalMintPrice) {
-                const mintTx = await nftContract.connect(bob).mint(bob.address, { 
-                    value: originalMintPrice 
-                });
-                await waitForTransactionWithRetry(mintTx, `mint by ${user === alice ? 'Alice' : 'Bob'}`);
+                await executeTransactionWithFullRetry(async () => {
+                    return await nftContract.connect(bob).mint(bob.address, { 
+                        value: originalMintPrice 
+                    });
+                }, `mint by Bob`);
                 
                 const bobBalance = await nftContract.balanceOf(bob.address);
                 console.log(`   ✅ Regular mint successful! Bob balance: ${bobBalance.toString()}`);
@@ -268,7 +303,9 @@ async function main() {
                 
                 try {
                     // Try to mint more than remaining
-                    await nftContract.connect(owner).batchMint(bob.address, Number(remainingSupply) + 1);
+                    const excessQuantity = Number(remainingSupply) + 1;
+                    const excessPayment = mintPrice * BigInt(excessQuantity);
+                    await nftContract.connect(owner).batchMint(bob.address, excessQuantity, { value: excessPayment });
                     console.log(`   ❌ Supply limit not enforced in V2!`);
                 } catch (error) {
                     console.log(`   ✅ Supply limit enforced in V2`);

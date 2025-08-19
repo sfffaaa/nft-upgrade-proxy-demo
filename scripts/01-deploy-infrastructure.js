@@ -49,6 +49,31 @@ async function waitForTransactionWithRetry(tx, description = "transaction", maxR
     }
 }
 
+// Function to execute transaction with full retry including re-submission
+async function executeTransactionWithFullRetry(txFunction, description = "transaction", maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   📤 Executing ${description} (attempt ${attempt}/${maxRetries})...`);
+            const tx = await txFunction();
+            console.log(`   📤 Transaction sent: ${tx.hash.slice(0, 10)}...`);
+            
+            const receipt = await waitForTransactionWithRetry(tx, description, 2, 45000); // 2 retries, 45s timeout per retry
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Full retry attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to execute ${description} after ${maxRetries} full retry attempts: ${error.message}`);
+            }
+            
+            // Wait longer between full retries
+            console.log(`   ⏳ Waiting 30s before full re-submission retry...`);
+            await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+    }
+}
+
 // Function to clear stuck transactions
 async function clearStuckTransactions(deployer) {
     try {
