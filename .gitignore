@@ -49,3 +49,6 @@ temp/
 # Private keys
 *.pem
 *.key
+
+# Development guidance (keep local only)
+CLAUDE.md

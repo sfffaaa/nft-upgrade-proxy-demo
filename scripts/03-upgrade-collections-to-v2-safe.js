@@ -375,6 +375,19 @@ async function main() {
     const upgradeFile = path.join(__dirname, `../deployments/${networkName}-upgrades.json`);
     fs.writeFileSync(upgradeFile, JSON.stringify(upgradeData, null, 2));
     console.log(`📁 Upgrade data saved to: ${upgradeFile}`);
+
+    // Clean up provider connections to prevent hanging
+    try {
+        if (ethers.provider && typeof ethers.provider.destroy === 'function') {
+            await ethers.provider.destroy();
+            console.log("🔌 Provider connection cleaned up");
+        } else if (ethers.provider && typeof ethers.provider.removeAllListeners === 'function') {
+            ethers.provider.removeAllListeners();
+            console.log("🔌 Provider listeners cleaned up");
+        }
+    } catch (error) {
+        console.log("⚠️  Provider cleanup warning:", error.message);
+    }
 }
 
 main().catch(console.error);
