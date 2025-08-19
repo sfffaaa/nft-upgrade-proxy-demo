@@ -137,14 +137,6 @@ localhost: {
 }
 ```
 
-### **Agung Testnet**
-```javascript
-agung: {
-  url: "https://wss-async.agung.peaq.network",
-  chainId: 9990,
-  accounts: [...] // Same test accounts
-}
-```
 
 ## 📊 System Flow
 

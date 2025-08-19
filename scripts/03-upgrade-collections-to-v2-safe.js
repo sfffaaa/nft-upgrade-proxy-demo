@@ -388,6 +388,9 @@ async function main() {
     } catch (error) {
         console.log("⚠️  Provider cleanup warning:", error.message);
     }
+
+    // Force exit to prevent hanging (standard for deployment scripts)
+    process.exit(0);
 }
 
 main().catch(console.error);
