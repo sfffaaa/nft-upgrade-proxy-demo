@@ -1,0 +1,17 @@
+{
+  "testTime": "2025-08-19T14:13:07.374Z",
+  "version": "2.0.0",
+  "collections": 2,
+  "featuresTests": [
+    "Batch Minting",
+    "Reveal Mechanism",
+    "Custom Token URIs",
+    "Base URI Management",
+    "EIP-2981 Royalties",
+    "Access Control",
+    "V1 Compatibility",
+    "Interface Support",
+    "Supply Enforcement"
+  ],
+  "allTestsPassed": true
+}

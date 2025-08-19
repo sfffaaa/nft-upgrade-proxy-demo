@@ -1,0 +1,40 @@
+{
+  "network": "agung",
+  "deploymentTime": "2025-08-19T14:32:06.644Z",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "factoryAddress": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+  "collections": [
+    {
+      "name": "Peaq Genesis Collection",
+      "symbol": "PGC",
+      "maxSupply": 10000,
+      "mintPrice": "10000000000000000",
+      "proxyAddress": "0x5E3d0fdE6f793B3115A9E7f5EBC195bbeeD35d6C",
+      "transactionHash": "0x0870fd9f2568a0fdbf5fcd317fd6f4e39dbd4e214fe9613ee335c191d1428746",
+      "blockNumber": 5118560
+    },
+    {
+      "name": "Peaq Art Gallery",
+      "symbol": "PAG",
+      "maxSupply": 5000,
+      "mintPrice": "50000000000000000",
+      "proxyAddress": "0xa12fFA0B9f159BB4C54bce579611927Addc51610",
+      "transactionHash": "0x71005be3e16b09c2fa951f2251249e031b671cc5dee12a0201c6c9dba001217c",
+      "blockNumber": 5118561
+    },
+    {
+      "name": "Peaq Exclusive Pass",
+      "symbol": "PEP",
+      "maxSupply": 1000,
+      "mintPrice": "100000000000000000",
+      "proxyAddress": "0x53839913417ebc7171723489F29B9B54F49b4EEA",
+      "transactionHash": "0xd97b5e44e437c4e655eb7d7e0b1a159df9d266e269458dbd6a88107777f95929",
+      "blockNumber": 5118562
+    }
+  ],
+  "allFactoryCollections": [
+    "0x5E3d0fdE6f793B3115A9E7f5EBC195bbeeD35d6C",
+    "0xa12fFA0B9f159BB4C54bce579611927Addc51610",
+    "0x53839913417ebc7171723489F29B9B54F49b4EEA"
+  ]
+}
