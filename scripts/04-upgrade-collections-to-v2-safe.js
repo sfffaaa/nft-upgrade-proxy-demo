@@ -228,7 +228,7 @@ async function main() {
         
         const logicV2Fixed = await ERC721LogicV2Fixed.deploy({
             gasPrice: deployGasPrice,
-            gasLimit: 2000000 // Explicit gas limit
+            gasLimit: 3000000 // Increased gas limit for larger contract
         });
         
         const deployTx = logicV2Fixed.deploymentTransaction();

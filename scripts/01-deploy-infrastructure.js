@@ -125,28 +125,46 @@ async function main() {
 
     // Step 1: Deploy ERC721LogicV1 (implementation contract)
     console.log("1. Deploying ERC721LogicV1...");
-    const ERC721LogicV1 = await ethers.getContractFactory("ERC721LogicV1");
-    const logicV1 = await ERC721LogicV1.deploy();
-    await logicV1.waitForDeployment();
-    const logicV1Address = await logicV1.getAddress();
-    console.log("   ✅ ERC721LogicV1 deployed to:", logicV1Address);
+    let logicV1Address;
+    await executeTransactionWithFullRetry(async () => {
+        const ERC721LogicV1 = await ethers.getContractFactory("ERC721LogicV1");
+        const logicV1 = await ERC721LogicV1.deploy();
+        const deployTx = logicV1.deploymentTransaction();
+        await logicV1.waitForDeployment();
+        logicV1Address = await logicV1.getAddress();
+        console.log("   🏭 ERC721LogicV1 deployed to:", logicV1Address);
+        return deployTx;
+    }, "ERC721LogicV1 deployment");
+    console.log("   ✅ ERC721LogicV1 deployment completed!");
 
     // Step 2: Deploy ProxyAdmin
     console.log("\n2. Deploying ProxyAdmin...");
-    const ProxyAdmin = await ethers.getContractFactory("ProxyAdmin");
-    const proxyAdmin = await ProxyAdmin.deploy(deployer.address);
-    await proxyAdmin.waitForDeployment();
-    const proxyAdminAddress = await proxyAdmin.getAddress();
-    console.log("   ✅ ProxyAdmin deployed to:", proxyAdminAddress);
-    console.log("   ProxyAdmin owner:", deployer.address);
+    let proxyAdminAddress;
+    await executeTransactionWithFullRetry(async () => {
+        const ProxyAdmin = await ethers.getContractFactory("ProxyAdmin");
+        const proxyAdmin = await ProxyAdmin.deploy(deployer.address);
+        const deployTx = proxyAdmin.deploymentTransaction();
+        await proxyAdmin.waitForDeployment();
+        proxyAdminAddress = await proxyAdmin.getAddress();
+        console.log("   🏭 ProxyAdmin deployed to:", proxyAdminAddress);
+        console.log("   ProxyAdmin owner:", deployer.address);
+        return deployTx;
+    }, "ProxyAdmin deployment");
+    console.log("   ✅ ProxyAdmin deployment completed!");
 
     // Step 3: Deploy NFTFactory
     console.log("\n3. Deploying NFTFactory...");
-    const NFTFactory = await ethers.getContractFactory("NFTFactory");
-    const factory = await NFTFactory.deploy(logicV1Address, proxyAdminAddress);
-    await factory.waitForDeployment();
-    const factoryAddress = await factory.getAddress();
-    console.log("   ✅ NFTFactory deployed to:", factoryAddress);
+    let factoryAddress;
+    await executeTransactionWithFullRetry(async () => {
+        const NFTFactory = await ethers.getContractFactory("NFTFactory");
+        const factory = await NFTFactory.deploy(logicV1Address, proxyAdminAddress);
+        const deployTx = factory.deploymentTransaction();
+        await factory.waitForDeployment();
+        factoryAddress = await factory.getAddress();
+        console.log("   🏭 NFTFactory deployed to:", factoryAddress);
+        return deployTx;
+    }, "NFTFactory deployment");
+    console.log("   ✅ NFTFactory deployment completed!");
 
     // Save deployment addresses to a file for later use
     const deploymentData = {
