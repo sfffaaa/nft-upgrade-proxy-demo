@@ -1,40 +1,40 @@
 {
   "network": "localhost",
-  "deploymentTime": "2025-08-19T14:39:06.207Z",
+  "deploymentTime": "2025-08-19T15:34:54.375Z",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "factoryAddress": "0xdbC43Ba45381e02825b14322cDdd15eC4B3164E6",
+  "factoryAddress": "0xD0141E899a65C95a556fE2B27e5982A6DE7fDD7A",
   "collections": [
     {
       "name": "Peaq Genesis Collection",
       "symbol": "PGC",
       "maxSupply": 10000,
       "mintPrice": "10000000000000000",
-      "proxyAddress": "0xb7c7142Cb2cBf105Eca46A00dDD0Fb3DD7698E8b",
-      "transactionHash": "0x86e76e4786a2362dcc463d1a89326e72c8027bb1baf191e181a667e047291862",
-      "blockNumber": 3868
+      "proxyAddress": "0x0B3463c91F71beB2872e8880455753Fbe26faCd5",
+      "transactionHash": "0xc3b29aba0e572d7c38ed0daea4d669aa9fbd8214c4cad5e0196ad402ecb4f4ec",
+      "blockNumber": 4370
     },
     {
       "name": "Peaq Art Gallery",
       "symbol": "PAG",
       "maxSupply": 5000,
       "mintPrice": "50000000000000000",
-      "proxyAddress": "0xBec97739793Aa880bf0c823f16D5609c48D50520",
-      "transactionHash": "0x38729b97422e501c6da4466a13aaed5ff9ba97ae5a5d580a536dc4f324e1051b",
-      "blockNumber": 3869
+      "proxyAddress": "0x6AfaF4feDB927f92eCB4faEf08EDAfDF85E46f96",
+      "transactionHash": "0xd7962b9d1cb69e1f16c9269213888fd53386c7520c5ef21a990187e4b1e269aa",
+      "blockNumber": 4371
     },
     {
       "name": "Peaq Exclusive Pass",
       "symbol": "PEP",
       "maxSupply": 1000,
       "mintPrice": "100000000000000000",
-      "proxyAddress": "0x65eeFFD443Bbf16e45520F554815ebbcAFAa82ab",
-      "transactionHash": "0x32b3ce20377875a177af5bf4eff82ba4bd2571b9b0decc45aa6a1d37f0b1594e",
-      "blockNumber": 3870
+      "proxyAddress": "0xfE690F9192F83cE063057d208161b6F79a9B77a2",
+      "transactionHash": "0x7271d2db202a90fa80f9e4b5c4ed4829d19289f65c175bb55efa932747d54225",
+      "blockNumber": 4372
     }
   ],
   "allFactoryCollections": [
-    "0xb7c7142Cb2cBf105Eca46A00dDD0Fb3DD7698E8b",
-    "0xBec97739793Aa880bf0c823f16D5609c48D50520",
-    "0x65eeFFD443Bbf16e45520F554815ebbcAFAa82ab"
+    "0x0B3463c91F71beB2872e8880455753Fbe26faCd5",
+    "0x6AfaF4feDB927f92eCB4faEf08EDAfDF85E46f96",
+    "0xfE690F9192F83cE063057d208161b6F79a9B77a2"
   ]
 }

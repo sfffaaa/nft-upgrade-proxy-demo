@@ -2,6 +2,52 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+// Function to wait for transaction with timeout and reorg handling
+async function waitForTransactionWithRetry(tx, description = "transaction", maxRetries = 3, timeoutMs = 60000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   ⏳ Waiting for ${description} (attempt ${attempt}/${maxRetries}, timeout: ${timeoutMs/1000}s)...`);
+            
+            // Create a timeout promise
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error(`Transaction wait timeout after ${timeoutMs/1000}s`)), timeoutMs)
+            );
+            
+            // Race between transaction confirmation and timeout
+            const receipt = await Promise.race([
+                tx.wait(),
+                timeoutPromise
+            ]);
+            
+            console.log(`   ✅ ${description} confirmed!`);
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to confirm ${description} after ${maxRetries} attempts: ${error.message}`);
+            }
+            
+            // Check if transaction is still pending
+            try {
+                const txStatus = await ethers.provider.getTransaction(tx.hash);
+                if (txStatus && txStatus.blockNumber) {
+                    console.log(`   🔍 Transaction was actually mined in block ${txStatus.blockNumber}, getting receipt...`);
+                    return await ethers.provider.getTransactionReceipt(tx.hash);
+                }
+                console.log(`   🔍 Transaction still pending, retrying...`);
+            } catch (checkError) {
+                console.log(`   ⚠️  Could not check transaction status: ${checkError.message}`);
+            }
+            
+            // Wait before retry
+            console.log(`   ⏳ Waiting 10 seconds before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+    }
+}
+
 async function main() {
     console.log("🚀 Advanced V2 Operations & Feature Testing");
     console.log("==========================================\n");
@@ -70,7 +116,7 @@ async function main() {
             console.log(`   Minting 3 tokens to Alice using batchMint...`);
             
             const batchMintTx = await nftContract.connect(owner).batchMint(alice.address, 3);
-            await batchMintTx.wait();
+            await waitForTransactionWithRetry(batchMintTx, "batch mint");
             
             const aliceBalance = await nftContract.balanceOf(alice.address);
             const newTotalSupply = await nftContract.totalSupply();
@@ -91,7 +137,7 @@ async function main() {
                 // Reveal the collection
                 console.log(`   Revealing the collection...`);
                 const revealTx = await nftContract.connect(owner).reveal();
-                await revealTx.wait();
+                await waitForTransactionWithRetry(revealTx, "reveal");
                 
                 const isNowRevealed = await nftContract.revealed();
                 console.log(`   ✅ Collection revealed: ${isNowRevealed}`);
@@ -107,7 +153,7 @@ async function main() {
             
             console.log(`   Setting custom URI for token ${customTokenId}...`);
             const setURITx = await nftContract.connect(owner).setTokenURI(customTokenId, customURI);
-            await setURITx.wait();
+            await waitForTransactionWithRetry(setURITx, "set custom URI");
             
             const tokenCustomURI = await nftContract.tokenURI(customTokenId);
             console.log(`   ✅ Custom URI set: ${tokenCustomURI}`);
@@ -130,7 +176,7 @@ async function main() {
             // Test royalty update
             console.log(`\n   Updating royalty to 5% (500 basis points)...`);
             const newRoyaltyTx = await nftContract.connect(owner).setRoyalty(owner.address, 500);
-            await newRoyaltyTx.wait();
+            await waitForTransactionWithRetry(newRoyaltyTx, "royalty update");
             
             const [newReceiver, newRoyaltyAmount] = await nftContract.royaltyInfo(latestTokenId, ethers.parseEther("1"));
             console.log(`   ✅ Updated royalty: ${ethers.formatEther(newRoyaltyAmount)} ETH (5%) to ${newReceiver}`);
@@ -141,7 +187,7 @@ async function main() {
             
             console.log(`   Updating base URI...`);
             const updateURITx = await nftContract.connect(owner).setBaseURI(newBaseURI);
-            await updateURITx.wait();
+            await waitForTransactionWithRetry(updateURITx, "URI update");
             
             const updatedBaseURI = await nftContract.baseURI();
             console.log(`   ✅ Base URI updated: ${updatedBaseURI}`);
@@ -189,7 +235,7 @@ async function main() {
                 const mintTx = await nftContract.connect(bob).mint(bob.address, { 
                     value: originalMintPrice 
                 });
-                await mintTx.wait();
+                await waitForTransactionWithRetry(mintTx, `mint by ${user === alice ? 'Alice' : 'Bob'}`);
                 
                 const bobBalance = await nftContract.balanceOf(bob.address);
                 console.log(`   ✅ Regular mint successful! Bob balance: ${bobBalance.toString()}`);

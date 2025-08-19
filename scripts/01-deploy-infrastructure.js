@@ -1,6 +1,80 @@
 const { ethers, upgrades } = require("hardhat");
+const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+
+// Function to wait for transaction with timeout and reorg handling
+async function waitForTransactionWithRetry(tx, description = "transaction", maxRetries = 3, timeoutMs = 60000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   ⏳ Waiting for ${description} (attempt ${attempt}/${maxRetries}, timeout: ${timeoutMs/1000}s)...`);
+            
+            // Create a timeout promise
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error(`Transaction wait timeout after ${timeoutMs/1000}s`)), timeoutMs)
+            );
+            
+            // Race between transaction confirmation and timeout
+            const receipt = await Promise.race([
+                tx.wait(),
+                timeoutPromise
+            ]);
+            
+            console.log(`   ✅ ${description} confirmed!`);
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to confirm ${description} after ${maxRetries} attempts: ${error.message}`);
+            }
+            
+            // Check if transaction is still pending
+            try {
+                const txStatus = await ethers.provider.getTransaction(tx.hash);
+                if (txStatus && txStatus.blockNumber) {
+                    console.log(`   🔍 Transaction was actually mined in block ${txStatus.blockNumber}, getting receipt...`);
+                    return await ethers.provider.getTransactionReceipt(tx.hash);
+                }
+                console.log(`   🔍 Transaction still pending, retrying...`);
+            } catch (checkError) {
+                console.log(`   ⚠️  Could not check transaction status: ${checkError.message}`);
+            }
+            
+            // Wait before retry
+            console.log(`   ⏳ Waiting 10 seconds before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+    }
+}
+
+// Function to clear stuck transactions
+async function clearStuckTransactions(deployer) {
+    try {
+        const currentNonce = await deployer.getNonce();
+        console.log(`   Current nonce: ${currentNonce}`);
+        
+        // Send a replacement transaction with higher gas price to clear mempool
+        console.log("   🔧 Clearing any stuck transactions...");
+        const clearTx = await deployer.sendTransaction({
+            to: deployer.address,
+            value: 0,
+            nonce: currentNonce,
+            gasLimit: 21000,
+            gasPrice: ethers.parseUnits("2", "gwei")
+        });
+        
+        await waitForTransactionWithRetry(clearTx, "stuck transaction clearing");
+        console.log("   ✅ Transaction mempool cleared");
+        
+        const newNonce = await deployer.getNonce();
+        console.log(`   New nonce: ${newNonce}`);
+        
+    } catch (error) {
+        console.log("   ⚠️  No stuck transactions to clear");
+    }
+}
 
 async function main() {
     console.log("🚀 Starting infrastructure deployment...\n");
@@ -12,8 +86,17 @@ async function main() {
     }
     
     const deployer = signers[0];
+    const networkName = hre.network.name;
+    
     console.log("Deploying contracts with account:", deployer.address);
-    console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
+    console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
+    console.log("Network:", networkName);
+    
+    // Clear stuck transactions if not on localhost
+    if (networkName !== "localhost" && networkName !== "hardhat") {
+        await clearStuckTransactions(deployer);
+    }
+    console.log();
 
     // Step 1: Deploy ERC721LogicV1 (implementation contract)
     console.log("1. Deploying ERC721LogicV1...");
@@ -42,7 +125,7 @@ async function main() {
 
     // Save deployment addresses to a file for later use
     const deploymentData = {
-        network: network.name,
+        network: networkName,
         deploymentTime: new Date().toISOString(),
         deployer: deployer.address,
         contracts: {
@@ -57,12 +140,12 @@ async function main() {
         fs.mkdirSync(deploymentsDir);
     }
 
-    const deploymentFile = path.join(deploymentsDir, `${network.name}-infrastructure.json`);
+    const deploymentFile = path.join(deploymentsDir, `${networkName}-infrastructure.json`);
     fs.writeFileSync(deploymentFile, JSON.stringify(deploymentData, null, 2));
 
     console.log("\n📄 Deployment Summary:");
     console.log("========================");
-    console.log(`Network: ${network.name}`);
+    console.log(`Network: ${networkName}`);
     console.log(`Deployer: ${deployer.address}`);
     console.log(`ERC721LogicV1: ${logicV1Address}`);
     console.log(`ProxyAdmin: ${proxyAdminAddress}`);
@@ -72,12 +155,12 @@ async function main() {
     console.log(`Deployment data saved to: ${deploymentFile}`);
 
     // Verify contracts on Etherscan (if not on localhost)
-    if (network.name !== "localhost" && network.name !== "hardhat") {
+    if (networkName !== "localhost" && networkName !== "hardhat") {
         console.log("\n🔍 Preparing contract verification...");
         console.log("Run the following commands to verify contracts:");
-        console.log(`npx hardhat verify --network ${network.name} ${logicV1Address}`);
-        console.log(`npx hardhat verify --network ${network.name} ${proxyAdminAddress} ${deployer.address}`);
-        console.log(`npx hardhat verify --network ${network.name} ${factoryAddress} ${logicV1Address} ${proxyAdminAddress}`);
+        console.log(`npx hardhat verify --network ${networkName} ${logicV1Address}`);
+        console.log(`npx hardhat verify --network ${networkName} ${proxyAdminAddress} ${deployer.address}`);
+        console.log(`npx hardhat verify --network ${networkName} ${factoryAddress} ${logicV1Address} ${proxyAdminAddress}`);
     }
 }
 

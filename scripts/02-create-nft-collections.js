@@ -2,6 +2,52 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+// Function to wait for transaction with timeout and reorg handling
+async function waitForTransactionWithRetry(tx, description = "transaction", maxRetries = 3, timeoutMs = 60000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`   ⏳ Waiting for ${description} (attempt ${attempt}/${maxRetries}, timeout: ${timeoutMs/1000}s)...`);
+            
+            // Create a timeout promise
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error(`Transaction wait timeout after ${timeoutMs/1000}s`)), timeoutMs)
+            );
+            
+            // Race between transaction confirmation and timeout
+            const receipt = await Promise.race([
+                tx.wait(),
+                timeoutPromise
+            ]);
+            
+            console.log(`   ✅ ${description} confirmed!`);
+            return receipt;
+            
+        } catch (error) {
+            console.log(`   ❌ Attempt ${attempt} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Failed to confirm ${description} after ${maxRetries} attempts: ${error.message}`);
+            }
+            
+            // Check if transaction is still pending
+            try {
+                const txStatus = await ethers.provider.getTransaction(tx.hash);
+                if (txStatus && txStatus.blockNumber) {
+                    console.log(`   🔍 Transaction was actually mined in block ${txStatus.blockNumber}, getting receipt...`);
+                    return await ethers.provider.getTransactionReceipt(tx.hash);
+                }
+                console.log(`   🔍 Transaction still pending, retrying...`);
+            } catch (checkError) {
+                console.log(`   ⚠️  Could not check transaction status: ${checkError.message}`);
+            }
+            
+            // Wait before retry
+            console.log(`   ⏳ Waiting 10 seconds before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+    }
+}
+
 async function main() {
     console.log("🎨 Starting NFT collections creation...\n");
 
@@ -63,7 +109,7 @@ async function main() {
             collection.mintPrice
         );
 
-        const receipt = await tx.wait();
+        const receipt = await waitForTransactionWithRetry(tx, `collection creation for ${collection.name}`);
         
         // Get the deployed proxy address from events
         const event = receipt.logs.find(
@@ -125,7 +171,7 @@ async function main() {
     
     // Mint a test NFT
     const mintTx = await firstCollection.mint(deployer.address, { value: deployedCollections[0].mintPrice });
-    await mintTx.wait();
+    await waitForTransactionWithRetry(mintTx, "test mint");
     
     const balance = await firstCollection.balanceOf(deployer.address);
     console.log(`✅ Test mint successful! Balance: ${balance} NFT(s)`);

@@ -28,7 +28,7 @@ contract ERC721LogicV2Fixed is ERC721LogicV1 {
         string memory _notRevealedUri,
         address _royaltyReceiver,
         uint96 _royaltyFeeNumerator
-    ) external onlyOwner {
+    ) external {
         require(bytes(baseURI).length == 0, "V2 already initialized"); // Prevent double initialization
         
         baseURI = _baseURI;

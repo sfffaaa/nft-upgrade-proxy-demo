@@ -1,0 +1,13 @@
+{
+  "network": "agung",
+  "upgradeTime": "2025-08-19T15:03:00.672Z",
+  "upgrader": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "newImplementation": "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8",
+  "upgradedCollections": [
+    {
+      "name": "Peaq Genesis Collection",
+      "symbol": "PGC",
+      "proxyAddress": "0xe73bc5BD4763A3307AB5F8F126634b7E12E3dA9b"
+    }
+  ]
+}

@@ -1,18 +1,7 @@
 {
   "network": "localhost",
-  "upgradeTime": "2025-08-19T14:41:06.360Z",
+  "upgradeTime": "2025-08-19T15:35:12.447Z",
   "upgrader": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "newImplementation": "0x0355B7B8cb128fA5692729Ab3AAa199C1753f726",
-  "upgradedCollections": [
-    {
-      "name": "Peaq Genesis Collection",
-      "symbol": "PGC",
-      "proxyAddress": "0xb7c7142Cb2cBf105Eca46A00dDD0Fb3DD7698E8b"
-    },
-    {
-      "name": "Peaq Art Gallery",
-      "symbol": "PAG",
-      "proxyAddress": "0xBec97739793Aa880bf0c823f16D5609c48D50520"
-    }
-  ]
+  "newImplementation": "0x276C216D241856199A83bf27b2286659e5b877D3",
+  "upgradedCollections": []
 }

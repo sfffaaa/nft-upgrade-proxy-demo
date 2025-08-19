@@ -1,10 +1,10 @@
 {
   "network": "agung",
-  "deploymentTime": "2025-08-19T14:31:24.580Z",
+  "deploymentTime": "2025-08-19T15:17:30.530Z",
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   "contracts": {
-    "ERC721LogicV1": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
-    "ProxyAdmin": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-    "NFTFactory": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
+    "ERC721LogicV1": "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154",
+    "ProxyAdmin": "0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575",
+    "NFTFactory": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90"
   }
 }
