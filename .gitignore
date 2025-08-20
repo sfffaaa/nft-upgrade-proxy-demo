@@ -24,7 +24,13 @@ coverage.json
 .idea/
 *.swp
 *.swo
+*.swn
+*.swa
 *~
+.*.swp
+.*.swo
+.*.swn
+.*.swa
 
 # OS files
 .DS_Store
