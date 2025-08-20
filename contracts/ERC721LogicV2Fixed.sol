@@ -39,7 +39,7 @@ contract ERC721LogicV2Fixed is ERC721LogicV1 {
         royaltyFeeNumerator = _royaltyFeeNumerator;
     }
 
-    function setBaseURI(string memory _baseURI) public {
+    function setBaseURI(string memory _baseURI) public onlyOwner {
         baseURI = _baseURI;
         emit BaseURIUpdated(_baseURI);
     }
@@ -56,7 +56,7 @@ contract ERC721LogicV2Fixed is ERC721LogicV1 {
             : "";
     }
 
-    function reveal() public {
+    function reveal() public onlyOwner {
         revealed = true;
         emit Revealed(true);
     }
@@ -75,7 +75,7 @@ contract ERC721LogicV2Fixed is ERC721LogicV1 {
         royaltyAmount = (salePrice * royaltyFeeNumerator) / 10000;
     }
 
-    function setRoyalty(address _receiver, uint96 _feeNumerator) public {
+    function setRoyalty(address _receiver, uint96 _feeNumerator) public onlyOwner {
         royaltyReceiver = _receiver;
         royaltyFeeNumerator = _feeNumerator;
     }
@@ -99,7 +99,7 @@ contract ERC721LogicV2Fixed is ERC721LogicV1 {
     }
 
     // Set custom token URI
-    function setTokenURI(uint256 tokenId, string memory _tokenURI) public {
+    function setTokenURI(uint256 tokenId, string memory _tokenURI) public onlyOwner {
         require(_ownerOf(tokenId) != address(0), "Token does not exist");
         // Store custom URI in mapping if needed - for now just emit event
         // In a full implementation, you'd store this in a mapping
